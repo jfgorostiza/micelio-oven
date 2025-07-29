@@ -3,27 +3,28 @@ import os
 import time
 import logging
 import serial
+import threading
 from datetime import datetime
 from camHandler import CamHandler
+from time import sleep   # Imports sleep (aka wait or pause) into the program
 
 class Controler():
     def __init__( self ) :
-        self.cam = CamHandler() # trhead comienza el loop
+        self.cam = CamHandler() 
+        self.cam.start() # thread comienza el loop de tomar fotos
         self.log_data = logging.getLogger("data")
         self.log_data.setLevel( logging.INFO )
         formater = logging.Formatter('%(message)s')
-        dir = os.path.direname(__file__)
+        dir = os.path.dirname(__file__)
         self.filename = os.path.join(dir, r'../../logs')
         data_fh = logging.FileHandler(self.filename)
         data_fh.setFormatter(formater)
         self.log_data.addHandler( data_fh )
 
         self.ser = serial.Serial('/dev/ttyACM0', 115200, timeout = 1)
-
-        self.tau = 5 # time between logs in secs
         self.start = time.time()
-
-
+        self.tau = 5 # time between logs in secs
+ 
     def loop( self ):
         msg = "dht1_T, dht2_T, dht3_T, dht1_H, dht2_H, dht3_H, hm, tm, CO2, eCO2, TVOC, t_min, t_max, h_min, h_max, heat_rele, hum_rele, fan_rele"
         while True:
@@ -47,7 +48,13 @@ class Controler():
                     print("No se recibió ninguna respuesta del Arduino.")
                 self.start = time.time()
 
+    def end( self ):
+#        except KeyboardInterrupt:
+#            print("Interrumpido por el usuario")
 
+        # Clean up everything
+        pan.stop()                 # At the end of the program, stop the PWM
+        GPIO.cleanup()           # Resets the GPIO pins back to defaults
 
         
         

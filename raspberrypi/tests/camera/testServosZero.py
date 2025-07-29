@@ -3,8 +3,8 @@ from time import sleep
 from gpiozero.pins.rpigpio import RPiGPIOFactory
 
 # Configurar el pin GPIO que utilizarás (en este caso GPIO 17)
-pin = 4 # pan
-#pin = 17 # tilt
+#pin = 4 # tilt
+pin = 17 # pan
 
 # Crear un objeto Servo en el pin GPIO 17
 servo = Servo(pin)
