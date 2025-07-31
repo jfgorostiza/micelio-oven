@@ -21,9 +21,11 @@ class CamHandler():
         self.led = LED(27)
         self.led.on()
         self.cap = Picamera2()
-        self.cap.preview_configuration.main.size = (1280, 720)
-        self.cap.preview_configuration.main.format = "RGB888"
-        self.cap.configure("preview")
+#        self.cap.preview_configuration.main.size = (1280, 720)
+#        self.cap.preview_configuration.main.format = "RGB888"
+#        self.cap.configure("preview")
+        cam_conf = self.cap.create_still_configuration()
+        self.cap.configure( cam_conf )
         self.cap.start()
 #        if not self.cap.isOpened():
 #            print("Error: No se pudo abrir la camara")
@@ -50,6 +52,9 @@ class CamHandler():
         self.stop_thread = False
         self.control_thread = threading.Thread(target = self.controlLoop, args=(1,))
 
+    def set_period_hours(self, hours):
+        self.tau = hours * 60 * 60
+
     def start( self ):
         self.control_thread.start()
 
@@ -57,6 +62,13 @@ class CamHandler():
         self.stop_thread = True
 
     def controlLoop(self, name):
+        for i, p in enumerate(self.servoPositions):
+            print("taking a picture: " + str(p))
+            self.moveServo("pan", value = p[0])
+            self.moveServo("tilt", value = p[1])
+#             sleep(1)
+            self.takePic( i )
+            self.start_time = time.time()
         while True:
             if (time.time() - self.start_time) > self.tau:
                 for i, p in enumerate(self.servoPositions):
@@ -75,7 +87,7 @@ class CamHandler():
     def moveServo( self, servoID, value, alpha = 0.95 ):
         valueSmoothed = 0
         valueOld = 0
-        print("Moving servo " + servoID)
+#        print("Moving servo " + servoID)
         if servoID == "pan" :
             servo = self.panServo
             valueSmoothed = value * (1-alpha) + self.panLast * alpha
@@ -83,18 +95,16 @@ class CamHandler():
             servo = self.tiltServo
             valueSmoothed = value * (1-alpha) + self.tiltLast * alpha
         valueOld = valueSmoothed
-        print(valueSmoothed)
+#        print(valueSmoothed)
         servo.value = valueSmoothed
         sleep(0.01)
         while(abs(valueSmoothed - value) > (1-alpha) ):
             valueSmoothed = value * (1-alpha) + valueOld * alpha
             valueOld = valueSmoothed
-            print(valueSmoothed)
+ #           print(valueSmoothed)
             if valueSmoothed < -1: 
-                print("<-1")
                 valueSmoothed = -1
             if valueSmoothed > 1: 
-                print(">1")
                 valueSmoothed = 1
             servo.value = valueSmoothed
             sleep(0.01)
@@ -102,8 +112,8 @@ class CamHandler():
             self.panLast= valueSmoothed
         else:
             self.tiltLast= valueSmoothed
-        print("last servo value = " + str(servo.value))
-        print("last valueSmoothed value = " + str(valueSmoothed))
+ #       print("last servo value = " + str(servo.value))
+ #       print("last valueSmoothed value = " + str(valueSmoothed))
         servo.value = None
 
 
@@ -119,6 +129,6 @@ class CamHandler():
     
     def end(self):
         self.cap.close()
-        self.panServo.stop()                 # At the end of the program, stop the PWM
-        self.tiltServo.stop()                 # At the end of the program, stop the PWM
+        #self.panServo.stop()                 # At the end of the program, stop the PWM
+        #self.tiltServo.stop()                 # At the end of the program, stop the PWM
    #     GPIO.cleanup()           # Resets the GPIO pins back to defaults
