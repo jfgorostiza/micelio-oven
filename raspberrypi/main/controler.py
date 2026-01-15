@@ -16,7 +16,7 @@ class Controler():
         self.cam.start() # thread comienza el loop de tomar fotos
         self.log_data = logging.getLogger("data")
         self.log_data.setLevel( logging.INFO )
-        self.reals = []
+        self.reals = [0,0,0,0,0,0]
 
         formater = logging.Formatter('%(asctime)s,%(message)s')
         dir = os.path.dirname(__file__)

@@ -5,7 +5,7 @@ import cv2
 import logging
 import threading, time, os
 from flask import Flask, jsonify
-import matplotlib.pyplot as plt
+##import matplotlib.pyplot as plt
 from controler import Controler
 
 

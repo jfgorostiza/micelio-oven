@@ -3,7 +3,7 @@ import threading
 import numpy as np
 #import cv2 as cv # de pronto solamente coge imagenes en negro
 import math
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import time
 #import RPi.GPIO as GPIO
 from picamera2 import Picamera2 #sudo apt install python3-picamera2 libcamera-apps libcamera-dev
