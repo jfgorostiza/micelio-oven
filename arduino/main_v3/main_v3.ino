@@ -32,10 +32,11 @@ dht1_T, dht2_T, dht3_T, dht1_H, dht2_H, dht3_H, hm, tm, CO2, eCO2, TVOC, t_min, 
 
 // Actuators
 #define HUM_RELE_PIN 49
+#define FAN_RELE_PIN 53
+#define HEAT_RELE_PIN  51
+
 #define FAN_LED_PIN 52
-#define FAN_PIN 53
 #define HEAT_LED_PIN  50
-#define HEAT_PIN  51
 
 Adafruit_SSD1305 display(128, 64, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
@@ -66,17 +67,22 @@ long now;
 void setup() {
   past = millis();
   Serial.begin( 115200 );
-  while( !Serial );
+  while( !Serial ){
+   digitalWrite( HEAT_LED_PIN, HIGH );
+   delay(500);
+   digitalWrite( HEAT_LED_PIN, LOW );
+   delay(500);    
+  }
   
   /* Heater */
-  pinMode( HEAT_PIN, OUTPUT );
-  digitalWrite( HEAT_PIN, HIGH );
+  pinMode( HEAT_RELE_PIN, OUTPUT );
+  digitalWrite( HEAT_RELE_PIN, HIGH );
   pinMode( HEAT_LED_PIN, OUTPUT );
   digitalWrite( HEAT_LED_PIN, LOW );
   
   /* Fan */
-  pinMode( FAN_PIN, OUTPUT );
-  digitalWrite( FAN_PIN, HIGH );
+  pinMode( FAN_RELE_PIN, OUTPUT );
+  digitalWrite( FAN_RELE_PIN, HIGH );
   pinMode( FAN_LED_PIN, OUTPUT );
   digitalWrite( FAN_LED_PIN, LOW );
 
@@ -87,7 +93,7 @@ void setup() {
   digitalWrite( HUM_PIN, HIGH );
 
   if ( !display.begin(0x3C) ) {
-     //Serial.println("Unable to initialize OLED");
+     Serial.println("Unable to initialize OLED");
      eternalError();     
   } else {//Serial.println("OK");
     display.clearDisplay();   // clears the screen and buffer
@@ -103,15 +109,15 @@ void setup() {
 
   //Serial.println("Sensor CSS...");
   if(!ccs.begin()){
-    //Serial.println("Failed to start CCS811 sensor! Please check your wiring.");
+    Serial.println("Failed to start CCS811 sensor! Please check your wiring.");
     eternalError();
 //  } else //Serial.println("OK");
   }
-  //Serial.println( "DHT_1 - begin" );
+  Serial.println( "DHT_1 - begin" );
   dht1.begin();
-  //Serial.println( "DHT_2 - begin" );
+  Serial.println( "DHT_2 - begin" );
   dht2.begin();
-  //Serial.println( "DHT_3 - begin" );
+  Serial.println( "DHT_3 - begin" );
   dht3.begin();
   readDHT();
 
@@ -122,7 +128,7 @@ void setup() {
     ccs.setTempOffset(temp - tm);
     //Serial.println(temp);
   } else {
-    //Serial.println("CCS sensor not available");
+    Serial.println("CCS sensor not available");
     eternalError();
   }
 //  test_hum();
@@ -160,6 +166,8 @@ void loop() {
     fanOff();
   }
 
+  if (tm <= 0) heatOff();
+
   if( hm <= h_min ) { // Enciende el humidificador
     //Serial.println("Estamos SECOS");
     humOn();
@@ -182,14 +190,31 @@ void loop() {
   delay(10);
 } // loop
 
+void test_rele() {
+  Serial.println( "Test RELE fan" );
+  while(1) {
+    Serial.println( "ON" );
+    heatOn();
+    digitalWrite( HUM_RELE_PIN, LOW ); 
+
+    delay(1000);
+
+    Serial.println( "OFF" );   
+    heatOff();
+    digitalWrite( HUM_RELE_PIN, HIGH ); 
+
+    delay(1000);
+  }  
+}
+
 void heatOn(){
-  digitalWrite( HEAT_PIN, LOW );
+  digitalWrite( HEAT_RELE_PIN, LOW );
   digitalWrite( HEAT_LED_PIN, HIGH );
   heatState = true;
 }
 
 void heatOff(){
-  digitalWrite( HEAT_PIN, HIGH );
+  digitalWrite( HEAT_RELE_PIN, HIGH );
   digitalWrite( HEAT_LED_PIN, LOW );
   heatState = false;
 }
@@ -207,12 +232,12 @@ void humOff(){
 }
 
 void fanOn() {
-  digitalWrite( FAN_PIN, LOW ); // enciende fan
+  digitalWrite( FAN_RELE_PIN, LOW ); // enciende fan
   fanState = true;
 }
 
 void fanOff() {
-  digitalWrite( FAN_PIN, HIGH ); // apaga fan
+  digitalWrite( FAN_RELE_PIN, HIGH ); // apaga fan
   fanState = false;  
 }
 
@@ -326,36 +351,103 @@ void displayValues() {
 
 
 void readDHT() {
-    h[0] = dht1.readHumidity();
-    t[0] = dht1.readTemperature();
-    hic[0] = dht1.computeHeatIndex(t[0], h[0], false);
-    h[1] = dht2.readHumidity();
-    t[1] = dht2.readTemperature();
-    hic[1] = dht2.computeHeatIndex(t[1], h[1], false);
-    h[2] = dht3.readHumidity();
-    t[2] = dht3.readTemperature();
-    hic[2] = dht3.computeHeatIndex(t[2], h[2], false);
-    hm = 0;
-    tm = 0;
-    hicm= 0;
-    
-  // solo los 2 primeros sensore, el 3º está fallando
-  for( int i = 0; i < 2; i ++ ) {
-    if (isnan(h[i]) || isnan(t[i]) ) {
-      h[i] = -hm;
-      t[i] = -tm;
-//      Serial.println(F("Failed to read from DHT sensor!"));
-//      Serial.println(i);
-    } else {
-      hm += h[i];
+  unsigned int num_sensors = 0;
+  bool sensor_ok[3] = {true, true, true};
+  unsigned int thres_t = 6;
+  unsigned int thres_h = 20;
+  int dev_t[3];
+  
+  h[0] = dht1.readHumidity();
+  t[0] = dht1.readTemperature();
+  hic[0] = dht1.computeHeatIndex(t[0], h[0], false);
+  h[1] = dht2.readHumidity();
+  t[1] = dht2.readTemperature();
+  hic[1] = dht2.computeHeatIndex(t[1], h[1], false);
+  h[2] = dht3.readHumidity();
+  t[2] = dht3.readTemperature();
+  hic[2] = dht3.computeHeatIndex(t[2], h[2], false);
+  hm = 0;
+  tm = 0;
+  hicm= 0;
+
+  // Temperatura
+  // calculamos medias
+  num_sensors = 0;
+  for( int i = 0; i < 3; i++ ) {
+    if( !isnan(t[i]) & t[i] > 0 ) {
+      sensor_ok[i] = true;
       tm += t[i];
-      hicm += hic[i];
+      num_sensors ++;
+    } else {
+      sensor_ok[i] = false;
     }
   }
-  hm = hm / 2.0;
-  tm = tm / 2.0;
-  hicm = hicm / 2.0;
+  tm = tm / num_sensors;
+
+// calculamos desviaciones
+  for( int i = 0; i < 3; i++ ) {
+    if( !isnan(t[i]) ) {
+      dev_t[i] = tm - t[i];
+      if( abs(dev_t[i]) > thres_t ) {
+        sensor_ok[i] = false;
+        Serial.print("Sensor fuera de rango. id = ");
+        Serial.println(i);
+      }      
+    }
+  }
+    // recalculamos medias
+  num_sensors = 0;
+  tm = 0;
+  for( int i = 0; i < 3; i++ ) {
+    if( sensor_ok[i] ) {
+      tm += t[i];
+      num_sensors ++;
+    }
+  }
+  if(num_sensors != 0) tm = tm / num_sensors;
+  else tm = -1;
+  
+  // humedad
+  // calculamos medias
+  num_sensors = 0;
+  for( int i = 0; i < 3; i++ ) {
+    if( !isnan(h[i]) & h[i] > 0) {
+      sensor_ok[i] = true;
+      hm += h[i];
+      num_sensors ++;
+    } else {
+      sensor_ok[i] = false;
+    }
+  }
+  hm = hm / num_sensors;
+
+// calculamos desviaciones
+  for( int i = 0; i < 3; i++ ) {
+    if( !isnan(h[i]) ) {
+      dev_t[i] = hm - h[i];
+      if( abs(dev_t[i]) > thres_h ) {
+        sensor_ok[i] = false;
+        Serial.print("Humedad fuera de rango. id = ");
+        Serial.println(i);
+      }      
+    }
+  }
+    // recalculamos medias
+  num_sensors = 0;
+  hm = 0;
+  for( int i = 0; i < 3; i++ ) {
+    if( sensor_ok[i] ) {
+      hm += h[i];
+      hicm += hic[i];
+      num_sensors ++;
+    }
+  }
+  if(num_sensors != 0) hm = hm / num_sensors;
+  else hm = -1;
+
+  hicm = hicm / num_sensors;
 }
+
 
 void readCCS() {
   if(ccs.available()){
@@ -368,7 +460,7 @@ void readCCS() {
       delay(1);
     }
   } else {
-//    Serial.println("CSS not available");
+    Serial.println("CSS not available");
     delay(1);
   }
 }

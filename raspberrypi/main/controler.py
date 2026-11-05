@@ -12,7 +12,8 @@ class Controler():
     def __init__( self ) :
         self.cam = CamHandler()
 #Configurar aqui cada cuanto se realizan las fotos
-        self.cam.set_period_hours(0.167) 
+#        self.cam.set_period_hours(0.167) 
+        self.cam.set_period_hours(1.0) 
         self.cam.start() # thread comienza el loop de tomar fotos
         self.log_data = logging.getLogger("data")
         self.log_data.setLevel( logging.INFO )
@@ -41,8 +42,11 @@ class Controler():
                 data = self.ser.readline().decode('utf-8').strip()
                 if data:
                     print(f"Datos recibidos: {data}")
-                    self.log_data.info(data)
-                    self.update_reals(data)
+                    values = data.split(',')
+                    print(f"len: {len(values)}")
+                    if len(values) == 18:  # Verificar que se recibieron 18 valores
+                        self.log_data.info(data)
+                        self.update_reals(data)
 #                    try:
 #                        values = [int(i) for i in data.split(',')]
 #                        if len(values) == 18:  # Verificar que se recibieron 18 valores
@@ -53,12 +57,11 @@ class Controler():
 #                    except ValueError:
 #                        print("Error: Los datos recibidos no son válidos para convertir a enteros.")
 
-
                 else:
                     print("No se recibió ninguna respuesta del Arduino.")
                 self.start = time.time()
     def update_reals(self, data):
-        self.reals[0] = data[7] #tm
+        self.reals[0] = data[7]     #tm
         self.reals[1] = data[6]     #hm
         self.reals[2] = data[9]     #eCO2
         self.reals[3] = data[15]     #heat rele
