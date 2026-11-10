@@ -1,2 +1,3 @@
 # MICOVEN
 ## The Growing Mycelium Camera from UDIT
+This project implements a Multisensor oven...
